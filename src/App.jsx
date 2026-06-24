@@ -620,27 +620,26 @@ export default function App() {
   const [authedUser, setAuthedUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
 
-  // Bootstrap Supabase + listen for auth state
   useEffect(() => {
-    initSupabase().then(client => {
-      if (!client) { setAuthReady(true); return; }
-      supabase = client;
-      supabase.auth.getSession().then(({ data }) => {
-        setAuthedUser(data.session?.user ?? null);
-        setAuthReady(true);
-      });
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        setAuthedUser(session?.user ?? null);
-      });
-      return () => subscription.unsubscribe();
+    if (!supabase) { setAuthReady(true); return; }
+    supabase.auth.getSession().then(({ data }) => {
+      setAuthedUser(data.session?.user ?? null);
+      setAuthReady(true);
     });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthedUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   if (!authReady) return (
     <div style={{ minHeight: "100vh", background: "#050510", display: "flex", alignItems: "center", justifyContent: "center", color: "#A855F7", fontFamily: "'Rajdhani', sans-serif", letterSpacing: "0.2em" }}>INITIALIZING...</div>
   );
   if (!authedUser && supabase) return <LoginScreen onLogin={() => {}} />;
+  return <AppInner authedUser={authedUser} />;
+}
 
+function AppInner({ authedUser }) {
   const saved = loadLocal();
   const [tabs, setTabs] = useState(() => {
     const saved_tabs = saved?.tabs;
