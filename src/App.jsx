@@ -832,11 +832,8 @@ export default function App() {
     setHistory(prev => ({ ...prev, [historySelDay]: { snap, xpDay } }));
   }, [checks, xpState, historySelDay]);
 
-  // SW registration + notification permission probe
+  // Notification permission probe (SW registered by vite-plugin-pwa)
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
-    }
     if (!("Notification" in window)) setNotifPermission("unsupported");
     else setNotifPermission(Notification.permission);
   }, []);
