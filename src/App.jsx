@@ -1,16 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { createClient } from "@supabase/supabase-js";
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
-let supabase = null;
-async function initSupabase() {
-  const url = import.meta.env.VITE_SUPABASE_URL;
-  const key = import.meta.env.VITE_SUPABASE_KEY;
-  if (!url || !key) return null;
-  try {
-    const { createClient } = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm");
-    return createClient(url, key);
-  } catch { return null; }
-}
+const _sbUrl = import.meta.env.VITE_SUPABASE_URL;
+const _sbKey = import.meta.env.VITE_SUPABASE_KEY;
+let supabase = (_sbUrl && _sbKey) ? createClient(_sbUrl, _sbKey) : null;
+function initSupabase() { return Promise.resolve(supabase); }
 
 // ── Storage ───────────────────────────────────────────────────────────────────
 const STORAGE_KEY = "lifetracker_v3";
