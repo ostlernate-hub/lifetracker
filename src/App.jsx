@@ -3,9 +3,9 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 // ── Supabase ──────────────────────────────────────────────────────────────────
 let supabase = null;
 async function initSupabase() {
-  const url = typeof __SUPABASE_URL__ !== "undefined" ? __SUPABASE_URL__ : (typeof import.meta !== "undefined" && import.meta.env?.VITE_SUPABASE_URL);
-  const key = typeof __SUPABASE_KEY__ !== "undefined" ? __SUPABASE_KEY__ : (typeof import.meta !== "undefined" && import.meta.env?.VITE_SUPABASE_KEY);
-  if (!url || !key || url === "undefined") return null;
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  const key = import.meta.env.VITE_SUPABASE_KEY;
+  if (!url || !key) return null;
   try {
     const { createClient } = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm");
     return createClient(url, key);
