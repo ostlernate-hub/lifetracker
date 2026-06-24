@@ -1,9 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
-// These are filled via environment variables in Vercel:
-// VITE_SUPABASE_URL and VITE_SUPABASE_KEY
-// For local testing without Supabase, the app falls back to localStorage.
 let supabase = null;
 async function initSupabase() {
   const url = typeof __SUPABASE_URL__ !== "undefined" ? __SUPABASE_URL__ : (typeof import.meta !== "undefined" && import.meta.env?.VITE_SUPABASE_URL);
@@ -17,11 +14,58 @@ async function initSupabase() {
 
 // ── Storage ───────────────────────────────────────────────────────────────────
 const STORAGE_KEY = "lifetracker_v3";
-const USER_ID = (() => {
-  let id = localStorage.getItem("lt_user_id");
-  if (!id) { id = `user_${Math.random().toString(36).slice(2, 10)}`; localStorage.setItem("lt_user_id", id); }
-  return id;
-})();
+
+// ── Login Screen ──────────────────────────────────────────────────────────────
+function LoginScreen({ onLogin }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handle = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+      if (err) setError(err.message);
+      else onLogin();
+    } catch { setError("Connection error. Try again."); }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#050510", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Rajdhani', sans-serif", padding: 24 }}>
+      <div style={{ width: "100%", maxWidth: 380, position: "relative", background: "linear-gradient(135deg,#0d0d20,#080818)", border: "1px solid #6B21A8", boxShadow: "0 0 8px #A855F788,0 0 2px #A855F7,inset 0 0 8px #A855F722", borderRadius: 4, padding: "40px 32px" }}>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>⚡</div>
+          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "0.15em", color: "#D946EF", textShadow: "0 0 20px #D946EF,0 0 40px #A855F7", textTransform: "uppercase" }}>Level Up!</div>
+          <div style={{ fontSize: 11, color: "#94A3B8", letterSpacing: "0.2em", marginTop: 4 }}>SHADOW MONARCH SYSTEM</div>
+        </div>
+        <form onSubmit={handle} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div>
+            <div style={{ fontSize: 10, color: "#94A3B8", letterSpacing: "0.15em", marginBottom: 6 }}>EMAIL</div>
+            <input
+              type="email" value={email} onChange={e => setEmail(e.target.value)} required
+              style={{ width: "100%", padding: "11px 14px", background: "#0a0a1e", border: "1px solid #6B21A8", color: "#E2E8F0", fontFamily: "inherit", fontSize: 14, outline: "none", borderRadius: 2, boxSizing: "border-box", letterSpacing: "0.05em" }}
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: "#94A3B8", letterSpacing: "0.15em", marginBottom: 6 }}>PASSWORD</div>
+            <input
+              type="password" value={password} onChange={e => setPassword(e.target.value)} required
+              style={{ width: "100%", padding: "11px 14px", background: "#0a0a1e", border: "1px solid #6B21A8", color: "#E2E8F0", fontFamily: "inherit", fontSize: 14, outline: "none", borderRadius: 2, boxSizing: "border-box", letterSpacing: "0.05em" }}
+            />
+          </div>
+          {error && <div style={{ fontSize: 12, color: "#F87171", background: "#F8717122", border: "1px solid #F8717155", padding: "8px 12px", borderRadius: 2 }}>{error}</div>}
+          <button type="submit" disabled={loading} style={{ marginTop: 8, padding: "12px 20px", background: loading ? "#A855F722" : "#A855F733", border: "1px solid #A855F7", color: "#A855F7", fontFamily: "inherit", fontSize: 12, cursor: loading ? "default" : "pointer", letterSpacing: "0.15em", boxShadow: "0 0 8px #A855F788", borderRadius: 2, textTransform: "uppercase", transition: "all 0.15s" }}>
+            {loading ? "AUTHENTICATING..." : "ENTER THE SYSTEM"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 const monthKey = () => new Date().toISOString().slice(0, 7);
@@ -578,6 +622,30 @@ function FinanceGoalsPanel({ finData, setFinData, isMobile }) {
 
 // ── Main App ──────────────────────────────────────────────────────────────────
 export default function App() {
+  const [authedUser, setAuthedUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+
+  // Bootstrap Supabase + listen for auth state
+  useEffect(() => {
+    initSupabase().then(client => {
+      if (!client) { setAuthReady(true); return; }
+      supabase = client;
+      supabase.auth.getSession().then(({ data }) => {
+        setAuthedUser(data.session?.user ?? null);
+        setAuthReady(true);
+      });
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setAuthedUser(session?.user ?? null);
+      });
+      return () => subscription.unsubscribe();
+    });
+  }, []);
+
+  if (!authReady) return (
+    <div style={{ minHeight: "100vh", background: "#050510", display: "flex", alignItems: "center", justifyContent: "center", color: "#A855F7", fontFamily: "'Rajdhani', sans-serif", letterSpacing: "0.2em" }}>INITIALIZING...</div>
+  );
+  if (!authedUser && supabase) return <LoginScreen onLogin={() => {}} />;
+
   const saved = loadLocal();
   const [tabs, setTabs] = useState(() => {
     const saved_tabs = saved?.tabs;
@@ -790,30 +858,26 @@ export default function App() {
     setHistory(prev => ({ ...prev, [dateKey]: { snap, xpDay } }));
   }, [checks, tabs]); // xpState intentionally omitted — xpDay updates on next check toggle
 
-  // Supabase init + sync
+  // Load data from Supabase once authed
   useEffect(() => {
-    initSupabase().then(client => {
-      if (!client) return;
-      supabase = client;
-      // Load from Supabase
-      client.from("lifetracker").select("data").eq("id", USER_ID).single().then(({ data }) => {
-        if (data?.data) {
-          const d = data.data;
-          if (d.tabs) setTabs(d.tabs);
-          if (d.checks) setChecks(d.checks);
-          if (d.goalChecks) setGoalChecks(d.goalChecks);
-          if (d.finData) setFinData(d.finData);
-          if (d.calClientId) setCalClientId(d.calClientId);
-          if (d.totalXP !== undefined || d.xpLog) setXpState({ totalXP: d.totalXP || 0, xpLog: d.xpLog || {} });
-          if (d.history) setHistory(d.history);
-          if (d.soundMuted !== undefined) setSoundMuted(d.soundMuted);
-          if (d.notifSettings) setNotifSettings(d.notifSettings);
-          if (d.lastExpenseCat) setLastExpenseCat(d.lastExpenseCat);
-          setSyncStatus("synced");
-        }
-      });
+    if (!supabase || !authedUser) return;
+    supabase.from("lifetracker").select("data").eq("id", authedUser.id).single().then(({ data }) => {
+      if (data?.data) {
+        const d = data.data;
+        if (d.tabs && d.tabs.find(t => t.id === "health")) setTabs(d.tabs);
+        if (d.checks) setChecks(d.checks);
+        if (d.goalChecks) setGoalChecks(d.goalChecks);
+        if (d.finData) setFinData(d.finData);
+        if (d.calClientId) setCalClientId(d.calClientId);
+        if (d.totalXP !== undefined || d.xpLog) setXpState({ totalXP: d.totalXP || 0, xpLog: d.xpLog || {} });
+        if (d.history) setHistory(d.history);
+        if (d.soundMuted !== undefined) setSoundMuted(d.soundMuted);
+        if (d.notifSettings) setNotifSettings(d.notifSettings);
+        if (d.lastExpenseCat) setLastExpenseCat(d.lastExpenseCat);
+        setSyncStatus("synced");
+      }
     });
-  }, []);
+  }, [authedUser]);
 
   // Recompute history snapshot when editing a past day
   useEffect(() => {
@@ -876,15 +940,15 @@ export default function App() {
   const saveTimer = useRef(null);
   const saveAll = useCallback((state) => {
     saveLocal(state);
-    if (!supabase) return;
+    if (!supabase || !authedUser) return;
     clearTimeout(saveTimer.current);
     setSyncStatus("syncing");
     saveTimer.current = setTimeout(() => {
-      supabase.from("lifetracker").upsert({ id: USER_ID, data: state, updated_at: new Date().toISOString() })
+      supabase.from("lifetracker").upsert({ id: authedUser.id, data: state, updated_at: new Date().toISOString() })
         .then(({ error }) => setSyncStatus(error ? "error" : "synced"))
         .catch(() => setSyncStatus("error"));
     }, 1500);
-  }, []);
+  }, [authedUser]);
 
   useEffect(() => {
     const state = { tabs, checks, goalChecks, finData, calClientId, totalXP: xpState.totalXP, xpLog: xpState.xpLog, history, soundMuted, notifSettings, lastExpenseCat };
@@ -1263,6 +1327,7 @@ export default function App() {
             )}
             <button onClick={() => { setShowHistory(h => !h); setEditing(false); }} style={{ padding: "5px 12px", background: showHistory ? `${C.accent}22` : "transparent", border: `1px solid ${showHistory ? C.accent : C.panelBorder}`, color: showHistory ? C.accent : C.textDim, fontFamily: "inherit", fontSize: 10, cursor: "pointer", letterSpacing: "0.1em", boxShadow: showHistory ? glowBox(C.accent) : "none" }}>📅 HISTORY</button>
 <button onClick={() => setShowSettings(true)} style={{ padding: "5px 12px", background: "transparent", border: `1px solid ${C.panelBorder}`, color: C.accent, fontFamily: "inherit", fontSize: 10, cursor: "pointer", letterSpacing: "0.1em" }}>⚙</button>
+            {authedUser && <button onClick={() => supabase.auth.signOut()} style={{ padding: "5px 12px", background: "transparent", border: `1px solid ${C.red}66`, color: C.red, fontFamily: "inherit", fontSize: 10, cursor: "pointer", letterSpacing: "0.1em" }}>EXIT</button>}
           </div>
         </header>
 
