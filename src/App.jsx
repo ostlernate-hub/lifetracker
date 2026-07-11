@@ -622,14 +622,20 @@ export default function App() {
 
   useEffect(() => {
     if (!supabase) { setAuthReady(true); return; }
-    supabase.auth.getSession().then(({ data }) => {
-      setAuthedUser(data.session?.user ?? null);
-      setAuthReady(true);
-    });
+
+    // Timeout fallback — if Supabase hangs, show login after 5s
+    const timeout = setTimeout(() => setAuthReady(true), 5000);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setAuthedUser(session?.user ?? null);
+      setAuthReady(true);
+      clearTimeout(timeout);
     });
-    return () => subscription.unsubscribe();
+
+    // Trigger initial session check
+    supabase.auth.getSession().catch(() => { setAuthReady(true); clearTimeout(timeout); });
+
+    return () => { subscription.unsubscribe(); clearTimeout(timeout); };
   }, []);
 
   if (!authReady) return (
