@@ -63,7 +63,9 @@ function LoginScreen({ onLogin }) {
 }
 
 const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
-const monthKey = () => new Date().toISOString().slice(0, 7);
+const monthKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; };
+const weekKey = () => { const d = new Date(); const jan1 = new Date(d.getFullYear(), 0, 1); const week = Math.ceil(((d - jan1) / 86400000 + jan1.getDay() + 1) / 7); return `${d.getFullYear()}-W${String(week).padStart(2,"0")}`; };
+const goalPeriodKey = (freq) => freq === "daily" ? todayKey() : freq === "weekly" ? weekKey() : freq === "monthly" ? monthKey() : "ongoing";
 const EXPENSE_CATEGORIES = ["Food", "Transport", "Bills", "Health", "Entertainment", "Shopping", "Savings", "Debt", "Other"];
 const DEFAULT_BUDGETS = { Food: 400, Transport: 150, Bills: 200, Health: 100, Entertainment: 100, Shopping: 150, Savings: 500, Debt: 200, Other: 100 };
 const DEFAULT_SAVINGS_GOALS = [
@@ -81,9 +83,9 @@ const defaultTabs = [
       { id: "f4", text: "Drink 8 glasses of water", freq: "daily" },
     ],
     goals: [
-      { id: "fg1", text: "Increase bench press by 20 lbs" },
-      { id: "fg2", text: "Hit a new deadlift PR" },
-      { id: "fg3", text: "Complete 100 consecutive push-ups" },
+      { id: "fg1", text: "Increase bench press by 20 lbs", freq: "ongoing" },
+      { id: "fg2", text: "Hit a new deadlift PR", freq: "ongoing" },
+      { id: "fg3", text: "Complete 100 consecutive push-ups", freq: "monthly" },
     ],
   },
   {
@@ -100,9 +102,9 @@ const defaultTabs = [
       { id: "h9", text: "Zinc (25mg)", freq: "daily" },
     ],
     goals: [
-      { id: "hg1", text: "Lose 10 lbs" },
-      { id: "hg2", text: "Get full blood panel done" },
-      { id: "hg3", text: "Complete 30-day clean eating challenge" },
+      { id: "hg1", text: "Lose 10 lbs", freq: "ongoing" },
+      { id: "hg2", text: "Get full blood panel done", freq: "monthly" },
+      { id: "hg3", text: "Complete 30-day clean eating challenge", freq: "monthly" },
     ],
   },
   {
@@ -114,9 +116,9 @@ const defaultTabs = [
       { id: "ag4", text: "Flexibility progression work", freq: "daily" },
     ],
     goals: [
-      { id: "agg1", text: "Achieve full splits" },
-      { id: "agg2", text: "Run a sub-8-minute mile" },
-      { id: "agg3", text: "Improve vertical jump by 3 inches" },
+      { id: "agg1", text: "Achieve full splits", freq: "ongoing" },
+      { id: "agg2", text: "Run a sub-8-minute mile", freq: "ongoing" },
+      { id: "agg3", text: "Improve vertical jump by 3 inches", freq: "monthly" },
     ],
   },
   {
@@ -128,10 +130,10 @@ const defaultTabs = [
       { id: "k4", text: "Watch 1 educational video or lecture", freq: "daily" },
     ],
     goals: [
-      { id: "kg1", text: "Hold a 5-minute foreign-language conversation" },
-      { id: "kg2", text: "Complete B1 language level" },
-      { id: "kg3", text: "Read 12 books this year" },
-      { id: "kg4", text: "Finish one online course" },
+      { id: "kg1", text: "Hold a 5-minute foreign-language conversation", freq: "ongoing" },
+      { id: "kg2", text: "Complete B1 language level", freq: "ongoing" },
+      { id: "kg3", text: "Read 12 books this year", freq: "ongoing" },
+      { id: "kg4", text: "Finish one online course", freq: "monthly" },
     ],
   },
   {
@@ -144,10 +146,10 @@ const defaultTabs = [
       { id: "fi5", text: "No unplanned online shopping", freq: "daily" },
     ],
     goals: [
-      { id: "fig1", text: "Save $500 this month" },
-      { id: "fig2", text: "Make one extra debt payment this month" },
-      { id: "fig3", text: "Review & adjust budget this month" },
-      { id: "fig4", text: "Complete a no-spend week this month" },
+      { id: "fig1", text: "Save $500 this month", freq: "monthly" },
+      { id: "fig2", text: "Make one extra debt payment this month", freq: "monthly" },
+      { id: "fig3", text: "Review & adjust budget this month", freq: "monthly" },
+      { id: "fig4", text: "Complete a no-spend week this month", freq: "monthly" },
     ],
   },
   {
@@ -159,9 +161,9 @@ const defaultTabs = [
       { id: "sp4", text: "Memorize 1 verse", freq: "weekly" },
     ],
     goals: [
-      { id: "spg1", text: "Read the entire New Testament" },
-      { id: "spg2", text: "Complete a devotional plan" },
-      { id: "spg3", text: "Fast once a week for a month" },
+      { id: "spg1", text: "Read the entire New Testament", freq: "ongoing" },
+      { id: "spg2", text: "Complete a devotional plan", freq: "monthly" },
+      { id: "spg3", text: "Fast once a week for a month", freq: "weekly" },
     ],
   },
 ];
@@ -262,6 +264,104 @@ function calColor(pct) {
 }
 
 // ── History View ──────────────────────────────────────────────────────────────
+// ── Goals Panel ───────────────────────────────────────────────────────────────
+const FREQ_LABELS = { daily: "DAILY", weekly: "WEEKLY", monthly: "MONTHLY", ongoing: "ONGOING" };
+const FREQ_COLORS = { daily: "#4ADE80", weekly: "#38BDF8", monthly: "#FBBF24", ongoing: "#A855F7" };
+
+function GoalsPanel({ tabs, goalChecks, toggleGoal, isMobile }) {
+  const [filter, setFilter] = useState("all");
+
+  const allGoals = tabs.flatMap(tab => (tab.goals || []).map(g => ({ ...g, freq: g.freq || "ongoing", tabId: tab.id, tabLabel: tab.label, tabIcon: tab.icon, tabStat: tab.stat })));
+  const filtered = filter === "all" ? allGoals : allGoals.filter(g => g.freq === filter);
+
+  const isDone = (g) => {
+    const period = goalPeriodKey(g.freq);
+    return !!goalChecks[`${g.tabId}::${g.id}::${period}`];
+  };
+
+  const total = allGoals.length;
+  const done = allGoals.filter(isDone).length;
+  const pct = total ? Math.round(done / total * 100) : 0;
+
+  // Group by tab
+  const byTab = tabs.map(tab => {
+    const goals = filtered.filter(g => g.tabId === tab.id);
+    if (!goals.length) return null;
+    const tabDone = goals.filter(isDone).length;
+    return { tab, goals, tabDone };
+  }).filter(Boolean);
+
+  return (
+    <div style={{ padding: isMobile ? "16px 12px 100px" : "24px 28px", maxWidth: 720, margin: "0 auto" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 11, color: C.accent, letterSpacing: "0.25em", marginBottom: 4 }}>◈ QUEST BOARD</div>
+            <div style={{ fontSize: isMobile ? 20 : 24, fontWeight: 700, color: C.glowBright, textShadow: `0 0 16px ${C.glowBright}`, letterSpacing: "0.1em" }}>ALL GOALS</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 28, fontWeight: 800, color: pct === 100 ? C.green : C.glow, textShadow: `0 0 16px ${pct === 100 ? C.green : C.glow}` }}>{done}<span style={{ fontSize: 14, color: C.textDim }}>/{total}</span></div>
+            <div style={{ fontSize: 10, color: C.textDim, letterSpacing: "0.15em" }}>COMPLETED</div>
+          </div>
+        </div>
+        <StatBar pct={pct} color={pct === 100 ? C.green : C.glow} height={8} />
+        <div style={{ fontSize: 10, color: C.textDim, marginTop: 6, letterSpacing: "0.1em" }}>{pct}% COMPLETE</div>
+      </div>
+
+      {/* Frequency filter */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
+        {["all", "daily", "weekly", "monthly", "ongoing"].map(f => (
+          <button key={f} onClick={() => setFilter(f)} style={{ padding: "5px 12px", background: filter === f ? `${FREQ_COLORS[f] || C.glow}22` : "transparent", border: `1px solid ${filter === f ? (FREQ_COLORS[f] || C.glow) : "#2d2d5a"}`, color: filter === f ? (FREQ_COLORS[f] || C.glow) : C.textDim, fontFamily: "inherit", fontSize: 9, cursor: "pointer", letterSpacing: "0.12em", borderRadius: 2, textTransform: "uppercase" }}>
+            {f === "all" ? "ALL" : FREQ_LABELS[f]}
+          </button>
+        ))}
+      </div>
+
+      {/* Goals by section */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {byTab.map(({ tab, goals, tabDone }) => {
+          const secPct = Math.round(tabDone / goals.length * 100);
+          return (
+            <div key={tab.id} style={{ ...panelStyle({ padding: "16px" }), position: "relative" }}>
+              <PanelCorners />
+              {/* Section header */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 18 }}>{tab.icon}</span>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: "0.1em" }}>{tab.label.toUpperCase()}</div>
+                    <div style={{ fontSize: 9, color: C.accent, letterSpacing: "0.15em" }}>{tab.stat}</div>
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: secPct === 100 ? C.green : C.textDim }}>{tabDone}/{goals.length}</div>
+                  {secPct === 100 && <div style={{ fontSize: 9, color: C.green, letterSpacing: "0.1em" }}>✦ MASTERY</div>}
+                </div>
+              </div>
+              <div style={{ marginBottom: 10 }}><StatBar pct={secPct} color={secPct === 100 ? C.green : C.accent} height={3} /></div>
+              {/* Goal rows */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {goals.map(g => {
+                  const done = isDone(g);
+                  const fc = FREQ_COLORS[g.freq] || C.accent;
+                  return (
+                    <div key={g.id} onClick={(e) => toggleGoal(g.tabId, g.id, e, g.freq)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: done ? `${C.green}08` : "rgba(10,10,26,0.6)", border: `1px solid ${done ? C.green + "44" : "#1e1e3a"}`, borderLeft: `3px solid ${done ? C.green : fc + "66"}`, borderRadius: 2, cursor: "pointer", transition: "all 0.2s" }}>
+                      <HexCheck done={done} onClick={e => { e.stopPropagation(); toggleGoal(g.tabId, g.id, e, g.freq); }} />
+                      <span style={{ flex: 1, fontSize: isMobile ? 14 : 13, color: done ? C.green : C.text, textDecoration: done ? "line-through" : "none", opacity: done ? 0.7 : 1 }}>{g.text}</span>
+                      <span style={{ fontSize: 8, color: fc, border: `1px solid ${fc}44`, padding: "2px 6px", borderRadius: 2, letterSpacing: "0.1em", flexShrink: 0 }}>{FREQ_LABELS[g.freq]}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function HistoryView({ checks, tabs, history, isMobile, xpLog, goalChecks, toggleCheck, toggleGoal, selDay, setSelDay }) {
   const todayStr = todayKey();
   const nowDate  = new Date(); nowDate.setHours(0,0,0,0);
@@ -673,6 +773,7 @@ function AppInner({ authedUser }) {
   const [rankUpNotif, setRankUpNotif] = useState(null);
   const [history, setHistory] = useState(saved?.history || {});
   const [showHistory, setShowHistory] = useState(false);
+  const [showGoals, setShowGoals] = useState(false);
   const [historySelDay, setHistorySelDay] = useState(null);
   const [soundMuted, setSoundMuted] = useState(saved?.soundMuted || false);
   const [xpPopups, setXpPopups] = useState([]);
@@ -958,7 +1059,7 @@ function AppInner({ authedUser }) {
   const toast$ = (msg, type = "ok") => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
 
   const checked = (tid, taskId) => !!checks[`${today}::${tid}::${taskId}`];
-  const goalDone = (tid, gid) => !!goalChecks[`${tid}::${gid}`];
+  const goalDone = (tid, gid) => { const tab = tabs.find(t => t.id === tid); const goal = tab?.goals?.find(g => g.id === gid); const f = goal?.freq || "ongoing"; return !!goalChecks[`${tid}::${gid}::${goalPeriodKey(f)}`]; };
 
   const toggleCheck = (tid, taskId, e, date = today) => {
     const k = `${date}::${tid}::${taskId}`;
@@ -991,14 +1092,37 @@ function AppInner({ authedUser }) {
     }
   };
 
-  const toggleGoal = (tid, gid, e) => {
-    const wasChecked = !!goalChecks[`${tid}::${gid}`];
-    setGoalChecks(p => ({ ...p, [`${tid}::${gid}`]: !p[`${tid}::${gid}`] }));
+  const goalKey = (tid, gid, freq) => { const period = goalPeriodKey(freq || "ongoing"); return `${tid}::${gid}::${period}`; };
+  const goalDoneByKey = (tid, gid, freq) => !!goalChecks[goalKey(tid, gid, freq)];
+
+  const toggleGoal = (tid, gid, e, freq) => {
+    const tab = tabs.find(t => t.id === tid);
+    const goal = tab?.goals?.find(g => g.id === gid);
+    const f = freq || goal?.freq || "ongoing";
+    const k = goalKey(tid, gid, f);
+    const xpKey = `xp::goal::${k}`;
+    const wasChecked = !!goalChecks[k];
+    setGoalChecks(p => ({ ...p, [k]: !p[k] }));
     if (!wasChecked) {
-      awardXP(100, `xp::goal::${tid}::${gid}`);
+      awardXP(100, xpKey);
       playSound("goal");
       showXpPopup("+100 XP · QUEST COMPLETE!", e, C.yellow);
-    } else removeXP(100, `xp::goal::${tid}::${gid}`);
+      // Section bonus: all goals in tab completed
+      setTimeout(() => {
+        setGoalChecks(prev => {
+          if (!tab) return prev;
+          const allDone = tab.goals.every(g => {
+            const gf = g.freq || "ongoing";
+            return g.id === gid ? true : !!prev[goalKey(tid, g.id, gf)];
+          });
+          if (allDone) {
+            awardXP(150, `xp::goalbonus::${tid}::${goalPeriodKey("monthly")}`);
+            showXpPopup(`+150 XP · ${tab.label.toUpperCase()} MASTERY!`, e, C.glowBright);
+          }
+          return prev;
+        });
+      }, 300);
+    } else removeXP(100, xpKey);
   };
 
   const tabPct = (tab) => {
@@ -1312,7 +1436,7 @@ function AppInner({ authedUser }) {
             {isMobile && (
               <button onClick={() => setShowSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", color: C.accent, fontSize: 20, padding: 0, lineHeight: 1 }}>☰</button>
             )}
-            <div style={{ fontSize: isMobile ? 16 : 18, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: C.glowBright, textShadow: `0 0 20px ${C.glowBright},0 0 40px ${C.glow}` }}>Level Up!</div>
+            <img src="/favicon.svg" alt="Level Up!" style={{ height: isMobile ? 28 : 34, width: "auto", filter: `drop-shadow(0 0 6px ${C.glow})` }} />
             <RankBadge rank={currentRank} size="sm" />
             {!isMobile && <span style={{ fontSize: 10, color: currentRank.color, letterSpacing: "0.1em", border: `1px solid ${currentRank.color}44`, padding: "2px 8px", borderRadius: 2, textShadow: `0 0 8px ${currentRank.color}66` }}>Lv.{currentLevel} {currentRank.letter}-Rank</span>}
             {!isMobile && <span style={{ fontSize: 10, color: C.textDim, letterSpacing: "0.12em", border: `1px solid #2d2d5a`, padding: "2px 8px", borderRadius: 2 }}>{today}</span>}
@@ -1325,7 +1449,8 @@ function AppInner({ authedUser }) {
                 {syncing ? "…" : calConnected ? "SYNC" : "CAL"}
               </button>
             )}
-            <button onClick={() => { setShowHistory(h => !h); setEditing(false); }} style={{ padding: "5px 12px", background: showHistory ? `${C.accent}22` : "transparent", border: `1px solid ${showHistory ? C.accent : C.panelBorder}`, color: showHistory ? C.accent : C.textDim, fontFamily: "inherit", fontSize: 10, cursor: "pointer", letterSpacing: "0.1em", boxShadow: showHistory ? glowBox(C.accent) : "none" }}>📅 HISTORY</button>
+            <button onClick={() => { setShowGoals(g => !g); setShowHistory(false); setEditing(false); }} style={{ padding: "5px 12px", background: showGoals ? `${C.yellow}22` : "transparent", border: `1px solid ${showGoals ? C.yellow : C.panelBorder}`, color: showGoals ? C.yellow : C.textDim, fontFamily: "inherit", fontSize: 10, cursor: "pointer", letterSpacing: "0.1em", boxShadow: showGoals ? glowBox(C.yellow) : "none" }}>🏆 GOALS</button>
+            <button onClick={() => { setShowHistory(h => !h); setShowGoals(false); setEditing(false); }} style={{ padding: "5px 12px", background: showHistory ? `${C.accent}22` : "transparent", border: `1px solid ${showHistory ? C.accent : C.panelBorder}`, color: showHistory ? C.accent : C.textDim, fontFamily: "inherit", fontSize: 10, cursor: "pointer", letterSpacing: "0.1em", boxShadow: showHistory ? glowBox(C.accent) : "none" }}>📅 HISTORY</button>
 <button onClick={() => setShowSettings(true)} style={{ padding: "5px 12px", background: "transparent", border: `1px solid ${C.panelBorder}`, color: C.accent, fontFamily: "inherit", fontSize: 10, cursor: "pointer", letterSpacing: "0.1em" }}>⚙</button>
             {authedUser && <button onClick={() => supabase.auth.signOut()} style={{ padding: "5px 12px", background: "transparent", border: `1px solid ${C.red}66`, color: C.red, fontFamily: "inherit", fontSize: 10, cursor: "pointer", letterSpacing: "0.1em" }}>EXIT</button>}
           </div>
@@ -1341,14 +1466,19 @@ function AppInner({ authedUser }) {
           )}
 
           {/* Main content */}
-          <main style={{ flex: 1, padding: isMobile ? "16px 14px 100px" : "24px 28px", overflowY: "auto" }}>
+          <main style={{ flex: 1, padding: showGoals ? 0 : (isMobile ? "16px 14px 100px" : "24px 28px"), overflowY: "auto" }}>
+            {/* Goals panel */}
+            {showGoals && (
+              <GoalsPanel tabs={tabs} goalChecks={goalChecks} toggleGoal={toggleGoal} isMobile={isMobile} />
+            )}
+
             {/* History view */}
-            {showHistory && (
+            {!showGoals && showHistory && (
               <HistoryView checks={checks} tabs={tabs} history={history} isMobile={isMobile} xpLog={xpLog} goalChecks={goalChecks} toggleCheck={toggleCheck} toggleGoal={toggleGoal} selDay={historySelDay} setSelDay={setHistorySelDay} />
             )}
 
             {/* Mobile XP status strip */}
-            {!showHistory && isMobile && (
+            {!showGoals && !showHistory && isMobile && (
               <div style={{ ...panelStyle({ padding: "12px 16px", marginBottom: 16, position: "relative", border: `1px solid ${currentRank.color}55`, boxShadow: `0 0 10px ${currentRank.color}33` }) }}>
                 <PanelCorners />
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -1364,7 +1494,7 @@ function AppInner({ authedUser }) {
                 </div>
               </div>
             )}
-            {!showHistory && cur && (
+            {!showGoals && !showHistory && cur && (
               <>
                 {/* Tab header */}
                 <div style={{ ...panelStyle({ padding: isMobile ? "14px" : "18px 22px", marginBottom: 20, position: "relative" }) }}>
@@ -1558,8 +1688,13 @@ function AppInner({ authedUser }) {
         {/* Mobile bottom tab bar */}
         {isMobile && (
           <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#060612", borderTop: `1px solid ${C.panelBorder}`, display: "flex", overflowX: "auto", zIndex: 100, boxShadow: `0 -4px 20px ${C.glow}33` }}>
+            {/* Goals tab */}
+            <button onClick={() => { setShowGoals(g => !g); setShowHistory(false); setEditing(false); setFabOpen(false); }} style={{ flex:"0 0 auto", minWidth:64, padding:"10px 8px 12px", display:"flex", flexDirection:"column", alignItems:"center", gap:3, background: showGoals ? `${C.yellow}18` : "transparent", border:"none", borderTop:`2px solid ${showGoals ? C.yellow : "transparent"}`, cursor:"pointer" }}>
+              <span style={{ fontSize:20 }}>🏆</span>
+              <span style={{ fontSize:9, color: showGoals ? C.yellow : C.textDim, letterSpacing:"0.06em", textTransform:"uppercase" }}>Goals</span>
+            </button>
             {/* History tab */}
-            <button onClick={() => { setShowHistory(h => !h); setEditing(false); setFabOpen(false); }} style={{ flex:"0 0 auto", minWidth:64, padding:"10px 8px 12px", display:"flex", flexDirection:"column", alignItems:"center", gap:3, background: showHistory ? `${C.accent}18` : "transparent", border:"none", borderTop:`2px solid ${showHistory ? C.accent : "transparent"}`, cursor:"pointer" }}>
+            <button onClick={() => { setShowHistory(h => !h); setShowGoals(false); setEditing(false); setFabOpen(false); }} style={{ flex:"0 0 auto", minWidth:64, padding:"10px 8px 12px", display:"flex", flexDirection:"column", alignItems:"center", gap:3, background: showHistory ? `${C.accent}18` : "transparent", border:"none", borderTop:`2px solid ${showHistory ? C.accent : "transparent"}`, cursor:"pointer" }}>
               <span style={{ fontSize:20 }}>📅</span>
               <span style={{ fontSize:9, color: showHistory ? C.accent : C.textDim, letterSpacing:"0.06em", textTransform:"uppercase" }}>History</span>
             </button>
@@ -1567,7 +1702,7 @@ function AppInner({ authedUser }) {
               const active = tab.id === activeTab;
               const p = tabPct(tab);
               return (
-                <button key={tab.id} onClick={() => { setActiveTab(tab.id); setEditing(false); setShowHistory(false); setFabOpen(false); }} style={{ flex: "0 0 auto", minWidth: 64, padding: "10px 8px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: active ? `${C.glow}18` : "transparent", border: "none", borderTop: `2px solid ${active ? C.glowBright : "transparent"}`, cursor: "pointer", transition: "all 0.15s" }}>
+                <button key={tab.id} onClick={() => { setActiveTab(tab.id); setEditing(false); setShowHistory(false); setShowGoals(false); setFabOpen(false); }} style={{ flex: "0 0 auto", minWidth: 64, padding: "10px 8px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: active ? `${C.glow}18` : "transparent", border: "none", borderTop: `2px solid ${active ? C.glowBright : "transparent"}`, cursor: "pointer", transition: "all 0.15s" }}>
                   <span style={{ fontSize: 20, filter: active ? `drop-shadow(0 0 6px ${C.glowBright})` : "none" }}>{tab.icon}</span>
                   <span style={{ fontSize: 9, color: active ? C.glowBright : C.textDim, letterSpacing: "0.06em", textTransform: "uppercase", textShadow: active ? `0 0 8px ${C.glowBright}` : "none" }}>{tab.label}</span>
                   {p > 0 && p < 100 && <div style={{ width: 24, height: 2, background: "#1e1e3a", borderRadius: 1 }}><div style={{ height: "100%", width: `${p}%`, background: C.glow, borderRadius: 1 }} /></div>}
