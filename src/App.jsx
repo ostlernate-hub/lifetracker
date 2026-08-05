@@ -723,8 +723,7 @@ export default function App() {
   useEffect(() => {
     if (!supabase) { setAuthReady(true); return; }
 
-    // Timeout fallback — if Supabase hangs, show login after 5s
-    const timeout = setTimeout(() => setAuthReady(true), 5000);
+    const timeout = setTimeout(() => setAuthReady(true), 3000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setAuthedUser(session?.user ?? null);
@@ -732,14 +731,22 @@ export default function App() {
       clearTimeout(timeout);
     });
 
-    // Trigger initial session check
-    supabase.auth.getSession().catch(() => { setAuthReady(true); clearTimeout(timeout); });
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        setAuthedUser(data.session?.user ?? null);
+        setAuthReady(true);
+        clearTimeout(timeout);
+      })
+      .catch(() => { setAuthReady(true); clearTimeout(timeout); });
 
     return () => { subscription.unsubscribe(); clearTimeout(timeout); };
   }, []);
 
   if (!authReady) return (
-    <div style={{ minHeight: "100vh", background: "#050510", display: "flex", alignItems: "center", justifyContent: "center", color: "#A855F7", fontFamily: "'Rajdhani', sans-serif", letterSpacing: "0.2em" }}>INITIALIZING...</div>
+    <div style={{ minHeight: "100vh", background: "#050510", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#A855F7", fontFamily: "'Rajdhani', sans-serif", letterSpacing: "0.2em", gap: 12 }}>
+      <div>INITIALIZING...</div>
+      <div style={{ fontSize: 10, color: "#6B21A8" }}>{supabase ? "CONNECTING TO SUPABASE..." : "OFFLINE MODE"}</div>
+    </div>
   );
   if (!authedUser && supabase) return <LoginScreen onLogin={() => {}} />;
   return <AppInner authedUser={authedUser} />;
