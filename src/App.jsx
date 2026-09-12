@@ -34,7 +34,7 @@ function LoginScreen({ onLogin }) {
       <div style={{ width: "100%", maxWidth: 380, position: "relative", background: "linear-gradient(135deg,#0d0d20,#080818)", border: "1px solid #6B21A8", boxShadow: "0 0 8px #A855F788,0 0 2px #A855F7,inset 0 0 8px #A855F722", borderRadius: 4, padding: "40px 32px" }}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <div style={{ fontSize: 36, marginBottom: 8 }}>⚡</div>
-          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "0.15em", color: "#D946EF", textShadow: "0 0 20px #D946EF,0 0 40px #A855F7", textTransform: "uppercase" }}>Level Up!</div>
+          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "0.15em", color: "#D946EF", textShadow: "0 0 20px #D946EF,0 0 40px #A855F7", textTransform: "uppercase" }}>ARISE</div>
           <div style={{ fontSize: 11, color: "#94A3B8", letterSpacing: "0.2em", marginTop: 4 }}>SHADOW MONARCH SYSTEM</div>
         </div>
         <form onSubmit={handle} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -66,8 +66,6 @@ const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${Stri
 const monthKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; };
 const weekKey = () => { const d = new Date(); const jan1 = new Date(d.getFullYear(), 0, 1); const week = Math.ceil(((d - jan1) / 86400000 + jan1.getDay() + 1) / 7); return `${d.getFullYear()}-W${String(week).padStart(2,"0")}`; };
 const goalPeriodKey = (freq) => freq === "daily" ? todayKey() : freq === "weekly" ? weekKey() : freq === "monthly" ? monthKey() : "ongoing";
-const EXPENSE_CATEGORIES = ["Food", "Transport", "Bills", "Health", "Entertainment", "Shopping", "Savings", "Debt", "Other"];
-const DEFAULT_BUDGETS = { Food: 400, Transport: 150, Bills: 200, Health: 100, Entertainment: 100, Shopping: 150, Savings: 500, Debt: 200, Other: 100 };
 const DEFAULT_SAVINGS_GOALS = [
   { id: "sg1", label: "Emergency Fund", target: 5000, current: 0 },
   { id: "sg2", label: "Pay Off Credit Card", target: 2000, current: 0 },
@@ -267,6 +265,7 @@ function calColor(pct) {
 // ── Goals Panel ───────────────────────────────────────────────────────────────
 const FREQ_LABELS = { daily: "DAILY", weekly: "WEEKLY", monthly: "MONTHLY", ongoing: "ONGOING" };
 const FREQ_COLORS = { daily: "#4ADE80", weekly: "#38BDF8", monthly: "#FBBF24", ongoing: "#A855F7" };
+const GOAL_XP = { daily: 100, weekly: 150, monthly: 300, ongoing: 100 };
 
 function GoalsPanel({ tabs, goalChecks, toggleGoal, isMobile }) {
   const [filter, setFilter] = useState("all");
@@ -349,7 +348,7 @@ function GoalsPanel({ tabs, goalChecks, toggleGoal, isMobile }) {
                     <div key={g.id} onClick={(e) => toggleGoal(g.tabId, g.id, e, g.freq)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: done ? `${C.green}08` : "rgba(10,10,26,0.6)", border: `1px solid ${done ? C.green + "44" : "#1e1e3a"}`, borderLeft: `3px solid ${done ? C.green : fc + "66"}`, borderRadius: 2, cursor: "pointer", transition: "all 0.2s" }}>
                       <HexCheck done={done} onClick={e => { e.stopPropagation(); toggleGoal(g.tabId, g.id, e, g.freq); }} />
                       <span style={{ flex: 1, fontSize: isMobile ? 14 : 13, color: done ? C.green : C.text, textDecoration: done ? "line-through" : "none", opacity: done ? 0.7 : 1 }}>{g.text}</span>
-                      <span style={{ fontSize: 8, color: fc, border: `1px solid ${fc}44`, padding: "2px 6px", borderRadius: 2, letterSpacing: "0.1em", flexShrink: 0 }}>{FREQ_LABELS[g.freq]}</span>
+                      <span style={{ fontSize: 8, color: fc, border: `1px solid ${fc}44`, padding: "2px 6px", borderRadius: 2, letterSpacing: "0.1em", flexShrink: 0, whiteSpace: "nowrap" }}>{FREQ_LABELS[g.freq]} · +{GOAL_XP[g.freq] || 100} XP</span>
                     </div>
                   );
                 })}
@@ -580,7 +579,7 @@ function HistoryView({ checks, tabs, history, isMobile, xpLog, goalChecks, toggl
                     <div style={{ marginTop:8, paddingTop:8, borderTop:"1px solid #1e1e3a" }}>
                       <div style={{ fontSize:9, color:C.accent, letterSpacing:"0.15em", marginBottom:6 }}>OBJECTIVES</div>
                       {tab.goals.map(goal => {
-                        const isDone = !!goalChecks[`${tab.id}::${goal.id}`];
+                        const isDone = !!goalChecks[`${tab.id}::${goal.id}::${goalPeriodKey(goal.freq || "ongoing")}`];
                         return (
                           <div key={goal.id} onClick={()=>toggleGoal(tab.id, goal.id, null)}
                             style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer", padding:"4px 2px", borderRadius:2 }}>
@@ -762,9 +761,7 @@ function AppInner({ authedUser }) {
   const [activeTab, setActiveTab] = useState("fitness");
   const [checks, setChecks] = useState(saved?.checks || {});
   const [goalChecks, setGoalChecks] = useState(saved?.goalChecks || {});
-  const [finData, setFinData] = useState(saved?.finData || { expenses: [], budgets: DEFAULT_BUDGETS, savingsGoals: DEFAULT_SAVINGS_GOALS, assets: [], debts: [] });
-  const [calClientId, setCalClientId] = useState(saved?.calClientId || "");
-  const [calConnected, setCalConnected] = useState(false);
+  const [finData, setFinData] = useState(saved?.finData || { savingsGoals: DEFAULT_SAVINGS_GOALS, assets: [], debts: [] });
   const [showSettings, setShowSettings] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -772,7 +769,6 @@ function AppInner({ authedUser }) {
   const [newGoal, setNewGoal] = useState("");
   const [newTabName, setNewTabName] = useState("");
   const [toast, setToast] = useState(null);
-  const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState("local"); // local | syncing | synced | error
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [xpState, setXpState] = useState({ totalXP: saved?.totalXP || 0, xpLog: saved?.xpLog || {} });
@@ -788,11 +784,7 @@ function AppInner({ authedUser }) {
   const [notifSettings, setNotifSettings] = useState(saved?.notifSettings || { enabled: false, morningTime: "08:00", eveningTime: "20:00", morningMsg: "Time to complete your daily quests, Hunter!", eveningMsg: "" });
   const [notifPermission, setNotifPermission] = useState("default");
   const [confirmReset, setConfirmReset] = useState(false);
-  const [fabOpen, setFabOpen] = useState(false);
-  const [fabMode, setFabMode] = useState(null);
-  const [fabExpense, setFabExpense] = useState({ amount: "", category: "", note: "" });
-  const [fabTaskSearch, setFabTaskSearch] = useState("");
-  const [lastExpenseCat, setLastExpenseCat] = useState(saved?.lastExpenseCat || "Food");
+  const [newGoalFreq, setNewGoalFreq] = useState("ongoing");
   const sbRef = useRef(null);
   const today = todayKey();
 
@@ -976,12 +968,10 @@ function AppInner({ authedUser }) {
         if (d.checks) setChecks(d.checks);
         if (d.goalChecks) setGoalChecks(d.goalChecks);
         if (d.finData) setFinData(d.finData);
-        if (d.calClientId) setCalClientId(d.calClientId);
         if (d.totalXP !== undefined || d.xpLog) setXpState({ totalXP: d.totalXP || 0, xpLog: d.xpLog || {} });
         if (d.history) setHistory(d.history);
         if (d.soundMuted !== undefined) setSoundMuted(d.soundMuted);
         if (d.notifSettings) setNotifSettings(d.notifSettings);
-        if (d.lastExpenseCat) setLastExpenseCat(d.lastExpenseCat);
         setSyncStatus("synced");
       }
     });
@@ -1023,8 +1013,8 @@ function AppInner({ authedUser }) {
           const body = getMsg();
           if ("serviceWorker" in navigator) {
             const reg = await navigator.serviceWorker.ready;
-            reg.showNotification("Level Up!", { body, icon: "/favicon.svg", tag: "lt-reminder", renotify: true });
-          } else { new Notification("Level Up!", { body }); }
+            reg.showNotification("ARISE", { body, icon: "/favicon.svg", tag: "lt-reminder", renotify: true });
+          } else { new Notification("ARISE", { body }); }
         } catch {}
       }, target - now);
     };
@@ -1059,9 +1049,9 @@ function AppInner({ authedUser }) {
   }, [authedUser]);
 
   useEffect(() => {
-    const state = { tabs, checks, goalChecks, finData, calClientId, totalXP: xpState.totalXP, xpLog: xpState.xpLog, history, soundMuted, notifSettings, lastExpenseCat };
+    const state = { tabs, checks, goalChecks, finData, totalXP: xpState.totalXP, xpLog: xpState.xpLog, history, soundMuted, notifSettings };
     saveAll(state);
-  }, [tabs, checks, goalChecks, finData, calClientId, xpState, history, soundMuted, notifSettings, lastExpenseCat, saveAll]);
+  }, [tabs, checks, goalChecks, finData, xpState, history, soundMuted, notifSettings, saveAll]);
 
   const toast$ = (msg, type = "ok") => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
 
@@ -1110,10 +1100,12 @@ function AppInner({ authedUser }) {
     const xpKey = `xp::goal::${k}`;
     const wasChecked = !!goalChecks[k];
     setGoalChecks(p => ({ ...p, [k]: !p[k] }));
+    const xpAmt = GOAL_XP[f] || 100;
     if (!wasChecked) {
-      awardXP(100, xpKey);
+      awardXP(xpAmt, xpKey);
       playSound("goal");
-      showXpPopup("+100 XP · QUEST COMPLETE!", e, C.yellow);
+      const xpLabel = f === "weekly" ? "+150 XP · WEEKLY QUEST!" : f === "monthly" ? "+300 XP · MONTHLY QUEST!" : "+100 XP · QUEST COMPLETE!";
+      showXpPopup(xpLabel, e, C.yellow);
       // Section bonus: all goals in tab completed
       setTimeout(() => {
         setGoalChecks(prev => {
@@ -1129,7 +1121,7 @@ function AppInner({ authedUser }) {
           return prev;
         });
       }, 300);
-    } else removeXP(100, xpKey);
+    } else removeXP(xpAmt, xpKey);
   };
 
   const tabPct = (tab) => {
@@ -1140,7 +1132,7 @@ function AppInner({ authedUser }) {
 
   const addTask = (tid) => { if (!newTask.trim()) return; setTabs(p => p.map(t => t.id !== tid ? t : { ...t, tasks: [...t.tasks, { id: `tk_${Date.now()}`, text: newTask.trim(), freq: "daily" }] })); setNewTask(""); };
   const remTask = (tid, taskId) => setTabs(p => p.map(t => t.id !== tid ? t : { ...t, tasks: t.tasks.filter(x => x.id !== taskId) }));
-  const addGoalItem = (tid) => { if (!newGoal.trim()) return; setTabs(p => p.map(t => t.id !== tid ? t : { ...t, goals: [...t.goals, { id: `g_${Date.now()}`, text: newGoal.trim() }] })); setNewGoal(""); };
+  const addGoalItem = (tid) => { if (!newGoal.trim()) return; setTabs(p => p.map(t => t.id !== tid ? t : { ...t, goals: [...t.goals, { id: `g_${Date.now()}`, text: newGoal.trim(), freq: newGoalFreq }] })); setNewGoal(""); };
   const remGoal = (tid, gid) => setTabs(p => p.map(t => t.id !== tid ? t : { ...t, goals: t.goals.filter(g => g.id !== gid) }));
 
   const addTab = () => {
@@ -1153,36 +1145,9 @@ function AppInner({ authedUser }) {
     toast$(`"${newTabName.trim()}" quest log created`);
   };
 
-  const connectCalendar = () => {
-    if (!calClientId.trim()) { toast$("Enter your Google Client ID in Settings", "err"); return; }
-    setSyncing(true);
-    const load = () => {
-      window.gapi.load("client:auth2", async () => {
-        try {
-          await window.gapi.client.init({ clientId: calClientId.trim(), scope: "https://www.googleapis.com/auth/calendar.events", discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"] });
-          if (!window.gapi.auth2.getAuthInstance().isSignedIn.get()) await window.gapi.auth2.getAuthInstance().signIn();
-          setCalConnected(true); setSyncing(false); toast$("Calendar linked!");
-        } catch { setSyncing(false); toast$("Connection failed", "err"); }
-      });
-    };
-    if (!window.gapi) { const s = document.createElement("script"); s.src = "https://apis.google.com/js/api.js"; s.onload = load; document.head.appendChild(s); } else load();
-  };
-
-  const syncCal = async () => {
-    if (!calConnected) { connectCalendar(); return; }
-    setSyncing(true);
-    try {
-      const tab = tabs.find(t => t.id === activeTab);
-      const start = new Date(); start.setHours(8, 0, 0, 0); const end = new Date(); end.setHours(9, 0, 0, 0);
-      await window.gapi.client.calendar.events.insert({ calendarId: "primary", resource: { summary: `[LifeTracker] ${tab.label}`, start: { dateTime: start.toISOString() }, end: { dateTime: end.toISOString() }, description: tab.tasks.map(t => `• ${t.text}`).join("\n") } });
-      setSyncing(false); toast$(`${tab.label} synced to Calendar`);
-    } catch { setSyncing(false); toast$("Sync failed", "err"); }
-  };
-
   const cur = tabs.find(t => t.id === activeTab) || tabs[0];
   const pct = cur ? tabPct(cur) : 0;
   const overallPct = Math.round(tabs.reduce((s, t) => s + tabPct(t), 0) / (tabs.length || 1));
-  const isFinance = false; // Finance tab now uses normal task/goal UI
 
   const syncLabel = { local: "LOCAL", syncing: "SAVING…", synced: "SYNCED ●", error: "SYNC ERR" }[syncStatus];
   const syncColor = { local: C.textDim, syncing: C.yellow, synced: C.green, error: C.red }[syncStatus];
@@ -1335,12 +1300,6 @@ function AppInner({ authedUser }) {
             </div>
 
             <div style={{ marginBottom: 22 }}>
-              <div style={{ fontSize: 10, color: C.accent, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 8 }}>Google Calendar — Client ID</div>
-              <Inp value={calClientId} onChange={e => setCalClientId(e.target.value)} placeholder="123456789-abc.apps.googleusercontent.com" style={{ width: "100%", marginBottom: 10 }} />
-              <Btn onClick={() => { setShowSettings(false); connectCalendar(); }} color={C.glow}>{calConnected ? "RECONNECT" : "LINK CALENDAR"}</Btn>
-            </div>
-
-            <div style={{ marginBottom: 22 }}>
               <div style={{ fontSize: 10, color: C.accent, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 8 }}>Add New Quest Log</div>
               <div style={{ display: "flex", gap: 8 }}>
                 <Inp value={newTabName} onChange={e => setNewTabName(e.target.value)} onKeyDown={e => e.key === "Enter" && addTab()} placeholder="e.g. Sleep, Mindfulness…" style={{ flex: 1 }} />
@@ -1450,12 +1409,6 @@ function AppInner({ authedUser }) {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {!isMobile && <span style={{ fontSize: 10, color: syncColor, letterSpacing: "0.1em" }}>{syncLabel}</span>}
-            {!isMobile && calConnected && <span style={{ fontSize: 10, color: C.green }}>● CAL</span>}
-            {!isMobile && (
-              <button onClick={syncCal} style={{ padding: "5px 12px", background: "transparent", border: `1px solid ${calConnected ? C.green : C.panelBorder}`, color: calConnected ? C.green : C.textDim, fontFamily: "inherit", fontSize: 10, cursor: "pointer", letterSpacing: "0.1em" }}>
-                {syncing ? "…" : calConnected ? "SYNC" : "CAL"}
-              </button>
-            )}
             <button onClick={() => { setShowGoals(g => !g); setShowHistory(false); setEditing(false); }} style={{ padding: "5px 12px", background: showGoals ? `${C.yellow}22` : "transparent", border: `1px solid ${showGoals ? C.yellow : C.panelBorder}`, color: showGoals ? C.yellow : C.textDim, fontFamily: "inherit", fontSize: 10, cursor: "pointer", letterSpacing: "0.1em", boxShadow: showGoals ? glowBox(C.yellow) : "none" }}>🏆 GOALS</button>
             <button onClick={() => { setShowHistory(h => !h); setShowGoals(false); setEditing(false); }} style={{ padding: "5px 12px", background: showHistory ? `${C.accent}22` : "transparent", border: `1px solid ${showHistory ? C.accent : C.panelBorder}`, color: showHistory ? C.accent : C.textDim, fontFamily: "inherit", fontSize: 10, cursor: "pointer", letterSpacing: "0.1em", boxShadow: showHistory ? glowBox(C.accent) : "none" }}>📅 HISTORY</button>
 <button onClick={() => setShowSettings(true)} style={{ padding: "5px 12px", background: "transparent", border: `1px solid ${C.panelBorder}`, color: C.accent, fontFamily: "inherit", fontSize: 10, cursor: "pointer", letterSpacing: "0.1em" }}>⚙</button>
@@ -1518,11 +1471,9 @@ function AppInner({ authedUser }) {
                         </div>
                       </div>
                     </div>
-                    {!isFinance && (
-                      <button onClick={() => setEditing(!editing)} style={{ padding: "7px 14px", background: editing ? `${C.glow}33` : "transparent", border: `1px solid ${editing ? C.glow : C.panelBorder}`, color: editing ? C.glow : C.textDim, fontFamily: "inherit", fontSize: 10, cursor: "pointer", letterSpacing: "0.1em", borderRadius: 2 }}>
-                        {editing ? "DONE" : "✎ EDIT"}
-                      </button>
-                    )}
+                    <button onClick={() => setEditing(!editing)} style={{ padding: "7px 14px", background: editing ? `${C.glow}33` : "transparent", border: `1px solid ${editing ? C.glow : C.panelBorder}`, color: editing ? C.glow : C.textDim, fontFamily: "inherit", fontSize: 10, cursor: "pointer", letterSpacing: "0.1em", borderRadius: 2 }}>
+                      {editing ? "DONE" : "✎ EDIT"}
+                    </button>
                   </div>
                   <div style={{ marginTop: 14 }}><StatBar pct={pct} /></div>
                 </div>
@@ -1564,19 +1515,41 @@ function AppInner({ authedUser }) {
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {cur.goals.map(goal => {
                           const done = goalDone(cur.id, goal.id);
+                          const gf = goal.freq || "ongoing";
+                          const fc = FREQ_COLORS[gf] || C.accent;
+                          const gxp = GOAL_XP[gf] || 100;
                           return (
-                            <div key={goal.id} onClick={(e) => !editing && toggleGoal(cur.id, goal.id, e)} style={{ display: "flex", alignItems: "center", gap: 12, background: done ? `${C.green}08` : "rgba(10,10,26,0.8)", border: `1px solid ${done ? C.green + "44" : "#1e1e3a"}`, borderLeft: `3px solid ${done ? C.green : C.accent + "55"}`, padding: isMobile ? "14px 12px" : "12px 14px", cursor: editing ? "default" : "pointer", transition: "all 0.2s", borderRadius: 2 }}>
-                              <HexCheck done={done} onClick={e => { e.stopPropagation(); toggleGoal(cur.id, goal.id, e); }} />
-                              <span style={{ flex: 1, fontSize: isMobile ? 15 : 14, color: done ? C.green : C.textDim, textDecoration: done ? "line-through" : "none" }}>{goal.text}</span>
-                              {editing && <button onClick={() => remGoal(cur.id, goal.id)} style={{ background: "none", border: "none", cursor: "pointer", color: C.red, fontSize: 18, padding: "0 4px", fontFamily: "inherit" }}>✕</button>}
+                            <div key={goal.id} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                              <div onClick={(e) => !editing && toggleGoal(cur.id, goal.id, e)} style={{ display: "flex", alignItems: "center", gap: 12, background: done ? `${C.green}08` : "rgba(10,10,26,0.8)", border: `1px solid ${done ? C.green + "44" : "#1e1e3a"}`, borderLeft: `3px solid ${done ? C.green : fc}`, padding: isMobile ? "14px 12px" : "12px 14px", cursor: editing ? "default" : "pointer", transition: "all 0.2s", borderRadius: 2 }}>
+                                <HexCheck done={done} onClick={e => { e.stopPropagation(); toggleGoal(cur.id, goal.id, e); }} />
+                                <span style={{ flex: 1, fontSize: isMobile ? 15 : 14, color: done ? C.green : C.textDim, textDecoration: done ? "line-through" : "none" }}>{goal.text}</span>
+                                <span style={{ fontSize: 8, color: fc, border: `1px solid ${fc}44`, padding: "2px 6px", borderRadius: 2, letterSpacing: "0.1em", flexShrink: 0, whiteSpace: "nowrap" }}>{FREQ_LABELS[gf]} · +{gxp} XP</span>
+                                {editing && (
+                                  <>
+                                    <select value={gf} onChange={e => setTabs(p => p.map(t => t.id !== cur.id ? t : { ...t, goals: t.goals.map(g => g.id !== goal.id ? g : { ...g, freq: e.target.value }) }))} style={{ padding: "4px 6px", background: "#0a0a1e", border: `1px solid ${C.panelBorder}`, color: C.text, fontFamily: "inherit", fontSize: 10, outline: "none", borderRadius: 2, cursor: "pointer" }}>
+                                      <option value="ongoing">Ongoing</option>
+                                      <option value="weekly">Weekly</option>
+                                      <option value="monthly">Monthly</option>
+                                    </select>
+                                    <button onClick={() => remGoal(cur.id, goal.id)} style={{ background: "none", border: "none", cursor: "pointer", color: C.red, fontSize: 18, padding: "0 4px", fontFamily: "inherit" }}>✕</button>
+                                  </>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
                       </div>
                       {editing && (
-                        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                          <Inp value={newGoal} onChange={e => setNewGoal(e.target.value)} onKeyDown={e => e.key === "Enter" && addGoalItem(cur.id)} placeholder="Enter new objective…" style={{ flex: 1 }} />
-                          <Btn onClick={() => addGoalItem(cur.id)} color={C.glow}>ADD</Btn>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            {["ongoing","weekly","monthly"].map(f => (
+                              <button key={f} onClick={() => setNewGoalFreq(f)} style={{ padding: "4px 10px", background: newGoalFreq === f ? `${FREQ_COLORS[f]}22` : "transparent", border: `1px solid ${newGoalFreq === f ? FREQ_COLORS[f] : "#2d2d5a"}`, color: newGoalFreq === f ? FREQ_COLORS[f] : C.textDim, fontFamily: "inherit", fontSize: 9, cursor: "pointer", letterSpacing: "0.1em", borderRadius: 2, textTransform: "uppercase" }}>{f} · +{GOAL_XP[f]} XP</button>
+                            ))}
+                          </div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <Inp value={newGoal} onChange={e => setNewGoal(e.target.value)} onKeyDown={e => e.key === "Enter" && addGoalItem(cur.id)} placeholder="Enter new objective…" style={{ flex: 1 }} />
+                            <Btn onClick={() => addGoalItem(cur.id)} color={C.glow}>ADD</Btn>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1591,117 +1564,16 @@ function AppInner({ authedUser }) {
           </main>
         </div>
 
-        {/* ── Floating Action Button ── */}
-        {(() => {
-          const fabBottom = isMobile ? 82 : 28;
-          const allDailyTasks = tabs.flatMap(tab =>
-            tab.tasks.filter(t => t.freq === "daily").map(t => ({ tab, task: t }))
-          );
-          const filteredTasks = fabTaskSearch.trim()
-            ? allDailyTasks.filter(({ tab, task }) =>
-                task.text.toLowerCase().includes(fabTaskSearch.toLowerCase()) ||
-                tab.label.toLowerCase().includes(fabTaskSearch.toLowerCase()))
-            : allDailyTasks;
-          const fabAddExpense = () => {
-            if (!fabExpense.amount || isNaN(Number(fabExpense.amount))) return;
-            const cat = fabExpense.category || lastExpenseCat;
-            setFinData(p => ({ ...p, expenses: [{ id: `e_${Date.now()}`, amount: Number(fabExpense.amount), category: cat, note: fabExpense.note, date: todayKey() }, ...(p.expenses||[])] }));
-            setLastExpenseCat(cat);
-            toast$(`$${Number(fabExpense.amount).toFixed(2)} logged to ${cat}`);
-            setFabExpense({ amount: "", category: cat, note: "" });
-            setFabOpen(false); setFabMode(null);
-          };
-          return (
-            <div style={{ position: "fixed", bottom: fabBottom, right: 20, zIndex: 500 }}>
-              {fabOpen && (
-                <div style={{ position: "absolute", bottom: 68, right: 0, width: isMobile ? "calc(100vw - 40px)" : 340, maxWidth: 340, animation: "fabSlideUp 0.2s ease" }}>
-                  <div style={{ ...panelStyle({ padding: 0, overflow: "hidden" }), position: "relative" }}>
-                    <PanelCorners />
-                    {fabMode === null && (
-                      <div style={{ display: "flex", flexDirection: "column" }}>
-                        <div style={{ padding: "12px 16px", fontSize: 9, color: C.accent, letterSpacing: "0.2em", textTransform: "uppercase", borderBottom: "1px solid #1e1e3a" }}>Quick Action</div>
-                        {[["expense","💸","Log Expense","Add a transaction instantly"],["task","✅","Check Off Task","Search & complete a task"]].map(([mode,icon,label,sub]) => (
-                          <button key={mode} onClick={() => { setFabMode(mode); if (mode==="expense") setFabExpense(p=>({...p,category:lastExpenseCat})); setFabTaskSearch(""); }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", background: "transparent", border: "none", borderBottom: "1px solid #1e1e3a", cursor: "pointer", textAlign: "left" }}>
-                            <span style={{ fontSize: 22 }}>{icon}</span>
-                            <div><div style={{ fontSize: 13, fontWeight: 600, color: C.text, letterSpacing: "0.06em" }}>{label}</div><div style={{ fontSize: 10, color: C.textDim }}>{sub}</div></div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {fabMode === "expense" && (
-                      <div style={{ padding: 16 }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                          <span style={{ fontSize: 12, color: C.accent, letterSpacing: "0.1em", textTransform: "uppercase" }}>💸 Quick Expense</span>
-                          <button onClick={() => setFabMode(null)} style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 16 }}>‹ Back</button>
-                        </div>
-                        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 9, color: C.textDim, letterSpacing: "0.1em", marginBottom: 4 }}>AMOUNT ($)</div>
-                            <Inp autoFocus value={fabExpense.amount} onChange={e => setFabExpense(p => ({...p, amount: e.target.value}))} onKeyDown={e => e.key === "Enter" && fabAddExpense()} placeholder="0.00" style={{ width: "100%" }} />
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 9, color: C.textDim, letterSpacing: "0.1em", marginBottom: 4 }}>CATEGORY</div>
-                            <select value={fabExpense.category || lastExpenseCat} onChange={e => setFabExpense(p => ({...p, category: e.target.value}))} style={{ padding: "10px 8px", background: "#0a0a1e", border: `1px solid ${C.panelBorder}`, color: C.text, fontFamily: "inherit", fontSize: 12, outline: "none", width: "100%", borderRadius: 2 }}>
-                              {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                          </div>
-                        </div>
-                        <div style={{ marginBottom: 10 }}>
-                          <div style={{ fontSize: 9, color: C.textDim, letterSpacing: "0.1em", marginBottom: 4 }}>NOTE (OPTIONAL)</div>
-                          <Inp value={fabExpense.note} onChange={e => setFabExpense(p => ({...p, note: e.target.value}))} onKeyDown={e => e.key === "Enter" && fabAddExpense()} placeholder="What was it for?" style={{ width: "100%" }} />
-                        </div>
-                        <Btn onClick={fabAddExpense} color={C.green} style={{ width: "100%", justifyContent: "center" }}>+ LOG EXPENSE</Btn>
-                      </div>
-                    )}
-                    {fabMode === "task" && (
-                      <div style={{ padding: 16 }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                          <span style={{ fontSize: 12, color: C.accent, letterSpacing: "0.1em", textTransform: "uppercase" }}>✅ Quick Task</span>
-                          <button onClick={() => setFabMode(null)} style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 16 }}>‹ Back</button>
-                        </div>
-                        <Inp autoFocus value={fabTaskSearch} onChange={e => setFabTaskSearch(e.target.value)} placeholder="Search tasks…" style={{ width: "100%", marginBottom: 8 }} />
-                        <div style={{ maxHeight: 240, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
-                          {filteredTasks.length === 0 && <div style={{ color: C.textDim, fontSize: 12, textAlign: "center", padding: "16px 0" }}>No tasks found</div>}
-                          {filteredTasks.map(({ tab, task }) => {
-                            const done = checked(tab.id, task.id);
-                            return (
-                              <button key={`${tab.id}::${task.id}`} onClick={(e) => toggleCheck(tab.id, task.id, e)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: done ? `${C.green}0e` : "#0a0a1e", border: `1px solid ${done ? C.green+"44" : "#1e1e3a"}`, borderLeft: `3px solid ${done ? C.green : C.panelBorder}`, cursor: "pointer", borderRadius: 2, textAlign: "left" }}>
-                                <div style={{ width: 14, height: 14, borderRadius: 2, border: `1.5px solid ${done ? C.green : C.panelBorder}`, background: done ? `${C.green}22` : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                  {done && <svg width="9" height="9" viewBox="0 0 12 12"><path d="M2 6l3 3 5-5" stroke={C.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>}
-                                </div>
-                                <div style={{ flex: 1 }}>
-                                  <div style={{ fontSize: 12, color: done ? C.green : C.text, textDecoration: done ? "line-through" : "none" }}>{task.text}</div>
-                                  <div style={{ fontSize: 9, color: C.textDim, marginTop: 1 }}>{tab.icon} {tab.label}</div>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              <button
-                onClick={() => { setFabOpen(o => !o); setFabMode(null); setFabTaskSearch(""); }}
-                aria-label={fabOpen ? "Close quick actions" : "Quick actions"}
-                style={{ width: 56, height: 56, borderRadius: "50%", background: fabOpen ? `${C.red}cc` : `linear-gradient(135deg,${C.glow},${C.glowBright})`, border: "none", cursor: "pointer", fontSize: fabOpen ? 22 : 28, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 20px ${fabOpen ? C.red : C.glow}88,0 0 40px ${fabOpen ? C.red : C.glow}33`, color: "#fff", transition: "all 0.2s", fontWeight: 700 }}>
-                {fabOpen ? "✕" : "+"}
-              </button>
-            </div>
-          );
-        })()}
-
         {/* Mobile bottom tab bar */}
         {isMobile && (
           <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#060612", borderTop: `1px solid ${C.panelBorder}`, display: "flex", overflowX: "auto", zIndex: 100, boxShadow: `0 -4px 20px ${C.glow}33` }}>
             {/* Goals tab */}
-            <button onClick={() => { setShowGoals(g => !g); setShowHistory(false); setEditing(false); setFabOpen(false); }} style={{ flex:"0 0 auto", minWidth:64, padding:"10px 8px 12px", display:"flex", flexDirection:"column", alignItems:"center", gap:3, background: showGoals ? `${C.yellow}18` : "transparent", border:"none", borderTop:`2px solid ${showGoals ? C.yellow : "transparent"}`, cursor:"pointer" }}>
+            <button onClick={() => { setShowGoals(g => !g); setShowHistory(false); setEditing(false); }} style={{ flex:"0 0 auto", minWidth:64, padding:"10px 8px 12px", display:"flex", flexDirection:"column", alignItems:"center", gap:3, background: showGoals ? `${C.yellow}18` : "transparent", border:"none", borderTop:`2px solid ${showGoals ? C.yellow : "transparent"}`, cursor:"pointer" }}>
               <span style={{ fontSize:20 }}>🏆</span>
               <span style={{ fontSize:9, color: showGoals ? C.yellow : C.textDim, letterSpacing:"0.06em", textTransform:"uppercase" }}>Goals</span>
             </button>
             {/* History tab */}
-            <button onClick={() => { setShowHistory(h => !h); setShowGoals(false); setEditing(false); setFabOpen(false); }} style={{ flex:"0 0 auto", minWidth:64, padding:"10px 8px 12px", display:"flex", flexDirection:"column", alignItems:"center", gap:3, background: showHistory ? `${C.accent}18` : "transparent", border:"none", borderTop:`2px solid ${showHistory ? C.accent : "transparent"}`, cursor:"pointer" }}>
+            <button onClick={() => { setShowHistory(h => !h); setShowGoals(false); setEditing(false); }} style={{ flex:"0 0 auto", minWidth:64, padding:"10px 8px 12px", display:"flex", flexDirection:"column", alignItems:"center", gap:3, background: showHistory ? `${C.accent}18` : "transparent", border:"none", borderTop:`2px solid ${showHistory ? C.accent : "transparent"}`, cursor:"pointer" }}>
               <span style={{ fontSize:20 }}>📅</span>
               <span style={{ fontSize:9, color: showHistory ? C.accent : C.textDim, letterSpacing:"0.06em", textTransform:"uppercase" }}>History</span>
             </button>
@@ -1709,7 +1581,7 @@ function AppInner({ authedUser }) {
               const active = tab.id === activeTab;
               const p = tabPct(tab);
               return (
-                <button key={tab.id} onClick={() => { setActiveTab(tab.id); setEditing(false); setShowHistory(false); setShowGoals(false); setFabOpen(false); }} style={{ flex: "0 0 auto", minWidth: 64, padding: "10px 8px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: active ? `${C.glow}18` : "transparent", border: "none", borderTop: `2px solid ${active ? C.glowBright : "transparent"}`, cursor: "pointer", transition: "all 0.15s" }}>
+                <button key={tab.id} onClick={() => { setActiveTab(tab.id); setEditing(false); setShowHistory(false); setShowGoals(false); }} style={{ flex: "0 0 auto", minWidth: 64, padding: "10px 8px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: active ? `${C.glow}18` : "transparent", border: "none", borderTop: `2px solid ${active ? C.glowBright : "transparent"}`, cursor: "pointer", transition: "all 0.15s" }}>
                   <span style={{ fontSize: 20, filter: active ? `drop-shadow(0 0 6px ${C.glowBright})` : "none" }}>{tab.icon}</span>
                   <span style={{ fontSize: 9, color: active ? C.glowBright : C.textDim, letterSpacing: "0.06em", textTransform: "uppercase", textShadow: active ? `0 0 8px ${C.glowBright}` : "none" }}>{tab.label}</span>
                   {p > 0 && p < 100 && <div style={{ width: 24, height: 2, background: "#1e1e3a", borderRadius: 1 }}><div style={{ height: "100%", width: `${p}%`, background: C.glow, borderRadius: 1 }} /></div>}

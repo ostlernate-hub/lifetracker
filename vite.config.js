@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "icons.svg"],
       manifest: {
-        name: "Level Up!",
-        short_name: "Level Up!",
+        name: "ARISE",
+        short_name: "ARISE",
         description: "Shadow Monarch life tracking system",
         theme_color: "#A855F7",
         background_color: "#050510",
