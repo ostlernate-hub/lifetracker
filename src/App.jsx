@@ -974,6 +974,7 @@ function AppInner({ authedUser }) {
         if (d.notifSettings) setNotifSettings(d.notifSettings);
         setSyncStatus("synced");
       }
+      sbLoaded.current = true;
     });
   }, [authedUser]);
 
@@ -1034,11 +1035,14 @@ function AppInner({ authedUser }) {
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [notifSettings, notifPermission, checks, tabs]);
 
+  // Guard: don't write to Supabase until we've loaded from it first (prevents overwriting cloud data with local defaults)
+  const sbLoaded = useRef(!supabase || !authedUser);
+
   // Debounced save
   const saveTimer = useRef(null);
   const saveAll = useCallback((state) => {
     saveLocal(state);
-    if (!supabase || !authedUser) return;
+    if (!supabase || !authedUser || !sbLoaded.current) return;
     clearTimeout(saveTimer.current);
     setSyncStatus("syncing");
     saveTimer.current = setTimeout(() => {
