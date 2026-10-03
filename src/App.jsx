@@ -9,6 +9,25 @@ function initSupabase() { return Promise.resolve(supabase); }
 
 // ── Storage ───────────────────────────────────────────────────────────────────
 const STORAGE_KEY = "lifetracker_v3";
+const BACKUP_KEY = "lifetracker_v3_backups";
+const MAX_BACKUPS = 5;
+
+function saveBackup(state) {
+  try {
+    const existing = JSON.parse(localStorage.getItem(BACKUP_KEY) || "[]");
+    const updated = [{ ts: Date.now(), data: state }, ...existing].slice(0, MAX_BACKUPS);
+    localStorage.setItem(BACKUP_KEY, JSON.stringify(updated));
+  } catch {}
+}
+function loadBackups() {
+  try { return JSON.parse(localStorage.getItem(BACKUP_KEY) || "[]"); } catch { return []; }
+}
+function stateHasData(state) {
+  return (state.totalXP > 0) ||
+    Object.keys(state.checks || {}).length > 0 ||
+    Object.keys(state.xpLog || {}).length > 0 ||
+    Object.keys(state.goalChecks || {}).length > 0;
+}
 
 // ── Login Screen ──────────────────────────────────────────────────────────────
 function LoginScreen({ onLogin }) {
@@ -805,6 +824,7 @@ function AppInner({ authedUser }) {
   const [notifSettings, setNotifSettings] = useState(saved?.notifSettings || { enabled: false, morningTime: "08:00", eveningTime: "20:00", morningMsg: "Time to complete your daily quests, Hunter!", eveningMsg: "" });
   const [notifPermission, setNotifPermission] = useState("default");
   const [confirmReset, setConfirmReset] = useState(false);
+  const [backups, setBackups] = useState([]);
   const [newGoalFreq, setNewGoalFreq] = useState("ongoing");
   const sbRef = useRef(null);
   const today = todayKey();
@@ -982,21 +1002,29 @@ function AppInner({ authedUser }) {
   // Load data from Supabase once authed
   useEffect(() => {
     if (!supabase || !authedUser) return;
-    supabase.from("lifetracker").select("data").eq("id", authedUser.id).single().then(({ data }) => {
-      if (data?.data) {
-        const d = data.data;
-        if (d.tabs && d.tabs.find(t => t.id === "health")) setTabs(d.tabs);
-        if (d.checks) setChecks(d.checks);
-        if (d.goalChecks) setGoalChecks(d.goalChecks);
-        if (d.finData) setFinData(d.finData);
-        if (d.totalXP !== undefined || d.xpLog) setXpState({ totalXP: d.totalXP || 0, xpLog: d.xpLog || {} });
-        if (d.history) setHistory(d.history);
-        if (d.soundMuted !== undefined) setSoundMuted(d.soundMuted);
-        if (d.notifSettings) setNotifSettings(d.notifSettings);
-        setSyncStatus("synced");
-      }
-      sbLoaded.current = true;
-    });
+    supabase.from("lifetracker").select("data").eq("id", authedUser.id).single()
+      .then(({ data, error }) => {
+        if (error && error.code !== "PGRST116") {
+          // PGRST116 = no row found (new user) — that's fine; anything else is a real error
+          setSyncStatus("error");
+          // sbLoaded stays false: no writes happen this session until user retries
+          return;
+        }
+        if (data?.data) {
+          const d = data.data;
+          if (d.tabs && d.tabs.find(t => t.id === "health")) setTabs(d.tabs);
+          if (d.checks) setChecks(d.checks);
+          if (d.goalChecks) setGoalChecks(d.goalChecks);
+          if (d.finData) setFinData(d.finData);
+          if (d.totalXP !== undefined || d.xpLog) setXpState({ totalXP: d.totalXP || 0, xpLog: d.xpLog || {} });
+          if (d.history) setHistory(d.history);
+          if (d.soundMuted !== undefined) setSoundMuted(d.soundMuted);
+          if (d.notifSettings) setNotifSettings(d.notifSettings);
+          setSyncStatus("synced");
+        }
+        sbLoaded.current = true;
+      })
+      .catch(() => setSyncStatus("error"));
   }, [authedUser]);
 
   // Recompute history snapshot when editing a past day
@@ -1064,6 +1092,9 @@ function AppInner({ authedUser }) {
   const saveAll = useCallback((state) => {
     saveLocal(state);
     if (!supabase || !authedUser || !sbLoaded.current) return;
+    // Never overwrite Supabase with a blank/default state — protects against race conditions or bad resets
+    if (!stateHasData(state)) return;
+    saveBackup(state);
     clearTimeout(saveTimer.current);
     setSyncStatus("syncing");
     saveTimer.current = setTimeout(() => {
@@ -1192,6 +1223,21 @@ function AppInner({ authedUser }) {
     setTabs(p => [...p, { id, label: newTabName.trim(), icon: icons[p.length % icons.length], stat: stats[p.length % stats.length], tasks: [], goals: [] }]);
     setActiveTab(id); setNewTabName(""); setShowSettings(false);
     toast$(`"${newTabName.trim()}" quest log created`);
+  };
+
+  const openSettings = () => { setBackups(loadBackups()); setShowSettings(true); };
+
+  const restoreBackup = (backup) => {
+    const d = backup.data;
+    if (d.tabs && d.tabs.find(t => t.id === "health")) setTabs(d.tabs);
+    if (d.checks) setChecks(d.checks);
+    if (d.goalChecks) setGoalChecks(d.goalChecks);
+    if (d.finData) setFinData(d.finData);
+    if (d.totalXP !== undefined || d.xpLog) setXpState({ totalXP: d.totalXP || 0, xpLog: d.xpLog || {} });
+    if (d.history) setHistory(d.history);
+    sbLoaded.current = true;
+    setShowSettings(false);
+    toast$("Backup restored");
   };
 
   const cur = tabs.find(t => t.id === activeTab) || tabs[0];
@@ -1412,6 +1458,34 @@ function AppInner({ authedUser }) {
               </p>
             </div>
 
+            <div style={{ marginBottom: 22, padding: "16px", background: "#0a0a1e", border: `1px solid #2d2d5a`, borderRadius: 2 }}>
+              <div style={{ fontSize: 10, color: C.accent, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 8 }}>🛡 Data Backups</div>
+              <p style={{ fontSize: 12, color: C.textDim, marginBottom: 10, lineHeight: 1.6 }}>
+                Backups are saved automatically to this device before every cloud sync. Restore one if your data is lost.
+              </p>
+              {backups.length === 0 ? (
+                <div style={{ fontSize: 12, color: C.textDim, padding: "8px 12px", background: "#050510", border: "1px solid #1e1e3a", borderRadius: 2 }}>No backups yet — they'll appear here after your first save.</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {backups.map((b, i) => {
+                    const d = new Date(b.ts);
+                    const label = d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+                    const xp = b.data?.totalXP || 0;
+                    const checks = Object.keys(b.data?.checks || {}).length;
+                    return (
+                      <div key={b.ts} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#050510", border: "1px solid #1e1e3a", borderRadius: 2 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 12, color: C.text }}>{label}{i === 0 ? <span style={{ fontSize: 9, color: C.green, marginLeft: 6, letterSpacing: "0.1em" }}>LATEST</span> : null}</div>
+                          <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>{xp} XP · {checks} check-offs</div>
+                        </div>
+                        <button onClick={() => restoreBackup(b)} style={{ padding: "5px 12px", background: "transparent", border: `1px solid ${C.accent}66`, color: C.accent, fontFamily: "inherit", fontSize: 10, cursor: "pointer", letterSpacing: "0.1em", borderRadius: 2 }}>RESTORE</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             <div style={{ marginBottom: 22, padding: "16px", background: "#1a0505", border: `1px solid ${C.red}55`, borderRadius: 2 }}>
               <div style={{ fontSize: 10, color: C.red, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 6 }}>⚠ Danger Zone</div>
               <p style={{ fontSize: 12, color: C.textDim, marginBottom: 12, lineHeight: 1.6 }}>
@@ -1460,7 +1534,7 @@ function AppInner({ authedUser }) {
             {!isMobile && <span style={{ fontSize: 10, color: syncColor, letterSpacing: "0.1em" }}>{syncLabel}</span>}
             <button onClick={() => { setShowGoals(g => !g); setShowHistory(false); setEditing(false); }} style={{ padding: "5px 12px", background: showGoals ? `${C.yellow}22` : "transparent", border: `1px solid ${showGoals ? C.yellow : C.panelBorder}`, color: showGoals ? C.yellow : C.textDim, fontFamily: "inherit", fontSize: 10, cursor: "pointer", letterSpacing: "0.1em", boxShadow: showGoals ? glowBox(C.yellow) : "none" }}>🏆 GOALS</button>
             <button onClick={() => { setShowHistory(h => !h); setShowGoals(false); setEditing(false); }} style={{ padding: "5px 12px", background: showHistory ? `${C.accent}22` : "transparent", border: `1px solid ${showHistory ? C.accent : C.panelBorder}`, color: showHistory ? C.accent : C.textDim, fontFamily: "inherit", fontSize: 10, cursor: "pointer", letterSpacing: "0.1em", boxShadow: showHistory ? glowBox(C.accent) : "none" }}>📅 HISTORY</button>
-<button onClick={() => setShowSettings(true)} style={{ padding: "5px 12px", background: "transparent", border: `1px solid ${C.panelBorder}`, color: C.accent, fontFamily: "inherit", fontSize: 10, cursor: "pointer", letterSpacing: "0.1em" }}>⚙</button>
+<button onClick={openSettings} style={{ padding: "5px 12px", background: "transparent", border: `1px solid ${C.panelBorder}`, color: C.accent, fontFamily: "inherit", fontSize: 10, cursor: "pointer", letterSpacing: "0.1em" }}>⚙</button>
             {authedUser && <button onClick={() => supabase.auth.signOut()} style={{ padding: "5px 12px", background: "transparent", border: `1px solid ${C.red}66`, color: C.red, fontFamily: "inherit", fontSize: 10, cursor: "pointer", letterSpacing: "0.1em" }}>EXIT</button>}
           </div>
         </header>
