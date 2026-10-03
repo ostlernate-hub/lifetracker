@@ -81,6 +81,8 @@ const defaultTabs = [
       { id: "f4", text: "Drink 8 glasses of water", freq: "daily" },
     ],
     goals: [
+      { id: "fg_gym", text: "Gym Sessions", freq: "weekly", type: "counter", target: 4 },
+      { id: "fg_run", text: "Running Sessions", freq: "weekly", type: "counter", target: 4 },
       { id: "fg1", text: "Increase bench press by 20 lbs", freq: "ongoing" },
       { id: "fg2", text: "Hit a new deadlift PR", freq: "ongoing" },
       { id: "fg3", text: "Complete 100 consecutive push-ups", freq: "monthly" },
@@ -267,7 +269,7 @@ const FREQ_LABELS = { daily: "DAILY", weekly: "WEEKLY", monthly: "MONTHLY", ongo
 const FREQ_COLORS = { daily: "#4ADE80", weekly: "#38BDF8", monthly: "#FBBF24", ongoing: "#A855F7" };
 const GOAL_XP = { daily: 100, weekly: 150, monthly: 300, ongoing: 100 };
 
-function GoalsPanel({ tabs, goalChecks, toggleGoal, isMobile }) {
+function GoalsPanel({ tabs, goalChecks, toggleGoal, onCounterChange, isMobile }) {
   const [filter, setFilter] = useState("all");
 
   const allGoals = tabs.flatMap(tab => (tab.goals || []).map(g => ({ ...g, freq: g.freq || "ongoing", tabId: tab.id, tabLabel: tab.label, tabIcon: tab.icon, tabStat: tab.stat })));
@@ -275,7 +277,10 @@ function GoalsPanel({ tabs, goalChecks, toggleGoal, isMobile }) {
 
   const isDone = (g) => {
     const period = goalPeriodKey(g.freq);
-    return !!goalChecks[`${g.tabId}::${g.id}::${period}`];
+    const k = `${g.tabId}::${g.id}::${period}`;
+    const val = goalChecks[k];
+    if (g.type === "counter") return typeof val === "number" ? val >= (g.target || 1) : false;
+    return !!val;
   };
 
   const total = allGoals.length;
@@ -344,6 +349,22 @@ function GoalsPanel({ tabs, goalChecks, toggleGoal, isMobile }) {
                 {goals.map(g => {
                   const done = isDone(g);
                   const fc = FREQ_COLORS[g.freq] || C.accent;
+                  if (g.type === "counter") {
+                    const k = `${g.tabId}::${g.id}::${goalPeriodKey(g.freq)}`;
+                    const count = typeof goalChecks[k] === "number" ? goalChecks[k] : 0;
+                    const target = g.target || 1;
+                    return (
+                      <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: done ? `${C.green}08` : "rgba(10,10,26,0.6)", border: `1px solid ${done ? C.green + "44" : "#1e1e3a"}`, borderLeft: `3px solid ${done ? C.green : fc + "66"}`, borderRadius: 2, transition: "all 0.2s" }}>
+                        <span style={{ flex: 1, fontSize: isMobile ? 14 : 13, color: done ? C.green : C.text }}>{g.text}</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                          <button onClick={e => onCounterChange(g.tabId, g.id, -1, target, g.freq, e)} style={{ width: 24, height: 24, background: "rgba(10,10,26,0.8)", border: `1px solid ${fc}55`, color: fc, fontFamily: "inherit", fontSize: 14, cursor: count > 0 ? "pointer" : "default", borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center", opacity: count > 0 ? 1 : 0.3, lineHeight: 1 }}>−</button>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: done ? C.green : C.glowBright, minWidth: 36, textAlign: "center", textShadow: done ? `0 0 8px ${C.green}` : "none" }}>{count}<span style={{ fontSize: 10, color: C.textDim }}>/{target}</span></span>
+                          <button onClick={e => onCounterChange(g.tabId, g.id, +1, target, g.freq, e)} style={{ width: 24, height: 24, background: "rgba(10,10,26,0.8)", border: `1px solid ${fc}55`, color: fc, fontFamily: "inherit", fontSize: 14, cursor: "pointer", borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>+</button>
+                        </div>
+                        <span style={{ fontSize: 8, color: fc, border: `1px solid ${fc}44`, padding: "2px 6px", borderRadius: 2, letterSpacing: "0.1em", flexShrink: 0, whiteSpace: "nowrap" }}>{FREQ_LABELS[g.freq]} · +{GOAL_XP[g.freq] || 150} XP</span>
+                      </div>
+                    );
+                  }
                   return (
                     <div key={g.id} onClick={(e) => toggleGoal(g.tabId, g.id, e, g.freq)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: done ? `${C.green}08` : "rgba(10,10,26,0.6)", border: `1px solid ${done ? C.green + "44" : "#1e1e3a"}`, borderLeft: `3px solid ${done ? C.green : fc + "66"}`, borderRadius: 2, cursor: "pointer", transition: "all 0.2s" }}>
                       <HexCheck done={done} onClick={e => { e.stopPropagation(); toggleGoal(g.tabId, g.id, e, g.freq); }} />
@@ -1060,7 +1081,7 @@ function AppInner({ authedUser }) {
   const toast$ = (msg, type = "ok") => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
 
   const checked = (tid, taskId) => !!checks[`${today}::${tid}::${taskId}`];
-  const goalDone = (tid, gid) => { const tab = tabs.find(t => t.id === tid); const goal = tab?.goals?.find(g => g.id === gid); const f = goal?.freq || "ongoing"; return !!goalChecks[`${tid}::${gid}::${goalPeriodKey(f)}`]; };
+  const goalDone = (tid, gid) => { const tab = tabs.find(t => t.id === tid); const goal = tab?.goals?.find(g => g.id === gid); const f = goal?.freq || "ongoing"; const k = `${tid}::${gid}::${goalPeriodKey(f)}`; const val = goalChecks[k]; if (goal?.type === "counter") return typeof val === "number" ? val >= (goal.target || 1) : false; return !!val; };
 
   const toggleCheck = (tid, taskId, e, date = today) => {
     const k = `${date}::${tid}::${taskId}`;
@@ -1138,6 +1159,30 @@ function AppInner({ authedUser }) {
   const remTask = (tid, taskId) => setTabs(p => p.map(t => t.id !== tid ? t : { ...t, tasks: t.tasks.filter(x => x.id !== taskId) }));
   const addGoalItem = (tid) => { if (!newGoal.trim()) return; setTabs(p => p.map(t => t.id !== tid ? t : { ...t, goals: [...t.goals, { id: `g_${Date.now()}`, text: newGoal.trim(), freq: newGoalFreq }] })); setNewGoal(""); };
   const remGoal = (tid, gid) => setTabs(p => p.map(t => t.id !== tid ? t : { ...t, goals: t.goals.filter(g => g.id !== gid) }));
+
+  const changeCounterGoal = (tid, gid, delta, target, freq, e) => {
+    const f = freq || "ongoing";
+    const k = goalKey(tid, gid, f);
+    const xpKey = `xp::goal::${k}`;
+    setGoalChecks(prev => {
+      const current = typeof prev[k] === "number" ? prev[k] : 0;
+      const next = Math.max(0, current + delta);
+      const wasComplete = current >= target;
+      const nowComplete = next >= target;
+      if (!wasComplete && nowComplete) {
+        awardXP(GOAL_XP[f] || 150, xpKey);
+        playSound("goal");
+        showXpPopup(`+${GOAL_XP[f] || 150} XP · WEEKLY QUEST!`, e, C.yellow);
+      } else if (wasComplete && !nowComplete) {
+        removeXP(GOAL_XP[f] || 150, xpKey);
+      }
+      return { ...prev, [k]: next };
+    });
+  };
+
+  const updateGoalTarget = (tid, gid, newTarget) => {
+    setTabs(p => p.map(t => t.id !== tid ? t : { ...t, goals: t.goals.map(g => g.id !== gid ? g : { ...g, target: Math.max(1, parseInt(newTarget) || 1) }) }));
+  };
 
   const addTab = () => {
     if (!newTabName.trim()) return;
@@ -1433,7 +1478,7 @@ function AppInner({ authedUser }) {
           <main style={{ flex: 1, padding: showGoals ? 0 : (isMobile ? "16px 14px 100px" : "24px 28px"), overflowY: "auto" }}>
             {/* Goals panel */}
             {showGoals && (
-              <GoalsPanel tabs={tabs} goalChecks={goalChecks} toggleGoal={toggleGoal} isMobile={isMobile} />
+              <GoalsPanel tabs={tabs} goalChecks={goalChecks} toggleGoal={toggleGoal} onCounterChange={changeCounterGoal} isMobile={isMobile} />
             )}
 
             {/* History view */}
@@ -1522,6 +1567,29 @@ function AppInner({ authedUser }) {
                           const gf = goal.freq || "ongoing";
                           const fc = FREQ_COLORS[gf] || C.accent;
                           const gxp = GOAL_XP[gf] || 100;
+                          if (goal.type === "counter") {
+                            const k = goalKey(cur.id, goal.id, gf);
+                            const count = typeof goalChecks[k] === "number" ? goalChecks[k] : 0;
+                            const target = goal.target || 1;
+                            return (
+                              <div key={goal.id} style={{ display: "flex", alignItems: "center", gap: 12, background: done ? `${C.green}08` : "rgba(10,10,26,0.8)", border: `1px solid ${done ? C.green + "44" : "#1e1e3a"}`, borderLeft: `3px solid ${done ? C.green : fc}`, padding: isMobile ? "14px 12px" : "12px 14px", transition: "all 0.2s", borderRadius: 2 }}>
+                                <span style={{ flex: 1, fontSize: isMobile ? 15 : 14, color: done ? C.green : C.textDim }}>{goal.text}</span>
+                                {editing && (
+                                  <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                                    <span style={{ fontSize: 9, color: C.textDim, letterSpacing: "0.1em" }}>TARGET</span>
+                                    <input type="number" min="1" max="99" value={target} onChange={e => updateGoalTarget(cur.id, goal.id, e.target.value)} style={{ width: 44, padding: "3px 6px", background: "#0a0a1e", border: `1px solid ${fc}66`, color: C.text, fontFamily: "inherit", fontSize: 13, outline: "none", borderRadius: 2, textAlign: "center" }} />
+                                  </div>
+                                )}
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                                  <button onClick={e => changeCounterGoal(cur.id, goal.id, -1, target, gf, e)} style={{ width: 28, height: 28, background: "rgba(10,10,26,0.8)", border: `1px solid ${fc}55`, color: fc, fontFamily: "inherit", fontSize: 16, cursor: count > 0 ? "pointer" : "default", borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center", opacity: count > 0 ? 1 : 0.3, lineHeight: 1 }}>−</button>
+                                  <span style={{ fontSize: 18, fontWeight: 800, color: done ? C.green : C.glowBright, minWidth: 48, textAlign: "center", textShadow: done ? `0 0 12px ${C.green}` : `0 0 8px ${C.glow}` }}>{count}<span style={{ fontSize: 12, color: C.textDim, fontWeight: 400 }}>/{target}</span></span>
+                                  <button onClick={e => changeCounterGoal(cur.id, goal.id, +1, target, gf, e)} style={{ width: 28, height: 28, background: "rgba(10,10,26,0.8)", border: `1px solid ${fc}55`, color: fc, fontFamily: "inherit", fontSize: 16, cursor: "pointer", borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>+</button>
+                                </div>
+                                <span style={{ fontSize: 8, color: fc, border: `1px solid ${fc}44`, padding: "2px 6px", borderRadius: 2, letterSpacing: "0.1em", flexShrink: 0, whiteSpace: "nowrap" }}>{FREQ_LABELS[gf]} · +{gxp} XP</span>
+                                {editing && <button onClick={() => remGoal(cur.id, goal.id)} style={{ background: "none", border: "none", cursor: "pointer", color: C.red, fontSize: 18, padding: "0 4px", fontFamily: "inherit" }}>✕</button>}
+                              </div>
+                            );
+                          }
                           return (
                             <div key={goal.id} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                               <div onClick={(e) => !editing && toggleGoal(cur.id, goal.id, e)} style={{ display: "flex", alignItems: "center", gap: 12, background: done ? `${C.green}08` : "rgba(10,10,26,0.8)", border: `1px solid ${done ? C.green + "44" : "#1e1e3a"}`, borderLeft: `3px solid ${done ? C.green : fc}`, padding: isMobile ? "14px 12px" : "12px 14px", cursor: editing ? "default" : "pointer", transition: "all 0.2s", borderRadius: 2 }}>
