@@ -1005,14 +1005,22 @@ function AppInner({ authedUser }) {
     supabase.from("lifetracker").select("data").eq("id", authedUser.id).single()
       .then(({ data, error }) => {
         if (error && error.code !== "PGRST116") {
-          // PGRST116 = no row found (new user) — that's fine; anything else is a real error
+          // Real load error — show warning but still allow saves (empty-state guard protects against overwrites)
           setSyncStatus("error");
-          // sbLoaded stays false: no writes happen this session until user retries
-          return;
-        }
-        if (data?.data) {
+        } else if (data?.data) {
           const d = data.data;
-          if (d.tabs && d.tabs.find(t => t.id === "health")) setTabs(d.tabs);
+          // Inject new counter goals into existing fitness tabs that predate this feature
+          const COUNTER_DEFAULTS = [
+            { id: "fg_gym", text: "Gym Sessions", freq: "weekly", type: "counter", target: 4 },
+            { id: "fg_run", text: "Running Sessions", freq: "weekly", type: "counter", target: 4 },
+          ];
+          const loadedTabs = d.tabs && d.tabs.find(t => t.id === "health") ? d.tabs.map(tab => {
+            if (tab.id !== "fitness") return tab;
+            const goals = tab.goals || [];
+            const toAdd = COUNTER_DEFAULTS.filter(cd => !goals.find(g => g.id === cd.id));
+            return toAdd.length ? { ...tab, goals: [...toAdd, ...goals] } : tab;
+          }) : null;
+          if (loadedTabs) setTabs(loadedTabs);
           if (d.checks) setChecks(d.checks);
           if (d.goalChecks) setGoalChecks(d.goalChecks);
           if (d.finData) setFinData(d.finData);
@@ -1024,7 +1032,7 @@ function AppInner({ authedUser }) {
         }
         sbLoaded.current = true;
       })
-      .catch(() => setSyncStatus("error"));
+      .catch(() => { setSyncStatus("error"); sbLoaded.current = true; });
   }, [authedUser]);
 
   // Recompute history snapshot when editing a past day
